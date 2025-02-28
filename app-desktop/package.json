@@ -1,0 +1,14 @@
+{
+  "name": "app-desktop",
+  "version": "1.0.0",
+  "description": "LockIn Electron Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^25.3.0",
+    "axios": "^1.4.0",
+    "bootstrap": "^5.3.0"
+  }
+} 
