@@ -1,6 +1,11 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, desktopCapturer, systemPreferences, session, ipcMain } = require('electron');
 const path = require('path');
 const isDev = process.env.NODE_ENV !== 'production';
+
+// Handle promise rejections
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled promise rejection:', error);
+});
 
 async function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -11,9 +16,53 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      webSecurity: true
+      webSecurity: true,
+      // Enable remote module for dev tools
+      enableRemoteModule: true
     }
   });
+
+  // Set up screen recording permissions handler
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+  // Set up screen recording permissions handler with error handling
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    desktopCapturer.getSources({ 
+      types: ['screen'],
+      thumbnailSize: { width: 0, height: 0 }
+    }).then((sources) => {
+      if (sources && sources.length > 0) {
+        callback({ video: sources[0], audio: false });
+      } else {
+        console.error('No screen sources found');
+        callback({ error: new Error('No screen sources available') });
+      }
+    }).catch((error) => {
+      console.error('Error getting screen sources:', error);
+      callback({ error });
+    });
+  }, { useSystemPicker: true });
+
+  // Check screen recording permission on macOS with error handling
+  if (process.platform === 'darwin') {
+    try {
+      const hasScreenCapturePermission = systemPreferences.getMediaAccessStatus('screen');
+      console.log('Screen capture permission status:', hasScreenCapturePermission);
+      
+      if (hasScreenCapturePermission !== 'granted') {
+        // This will trigger the permission dialog
+        await desktopCapturer.getSources({ types: ['screen'] });
+      }
+    } catch (error) {
+      console.error('Error checking screen capture permissions:', error);
+    }
+  }
 
   // In development, load from webpack dev server
   if (isDev) {

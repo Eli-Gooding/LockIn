@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import { Plus, Minus, CheckCircle2, GripVertical } from 'lucide-react';
 import { cn } from './utils';
+import { ScreenRecorder } from './services/ScreenRecorder';
 
 interface TodoItem {
   id: string;
@@ -12,6 +13,32 @@ interface TodoItem {
 export function App() {
   const [appState, setAppState] = useState<'welcome' | 'create' | 'complete' | 'accomplished'>('welcome');
   const [items, setItems] = useState<TodoItem[]>([{ id: '1', text: '', completed: false }]);
+  const [screenRecorder] = useState(() => new ScreenRecorder());
+
+  // Handle screen recording based on app state
+  useEffect(() => {
+    const handleScreenRecording = async () => {
+      try {
+        if (appState === 'complete' && !screenRecorder.isActive()) {
+          await screenRecorder.startRecording();
+        } else if (appState !== 'complete' && screenRecorder.isActive()) {
+          screenRecorder.stopRecording();
+        }
+      } catch (error) {
+        console.error('Screen recording error:', error);
+        // You might want to show a user-friendly error message here
+      }
+    };
+
+    handleScreenRecording();
+
+    // Cleanup on unmount
+    return () => {
+      if (screenRecorder.isActive()) {
+        screenRecorder.stopRecording();
+      }
+    };
+  }, [appState, screenRecorder]);
 
   // Add effect to check for completion
   useEffect(() => {
