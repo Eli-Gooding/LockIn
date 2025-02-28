@@ -7,6 +7,7 @@ async function createWindow() {
     width: 1200,
     height: 800,
     title: 'LockIn',
+    icon: path.join(__dirname, 'src/assets/LockedIn_Logo_Rounded.png'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -14,7 +15,7 @@ async function createWindow() {
     }
   });
 
-  // In development, load from the Next.js development server
+  // In development, load from webpack dev server
   if (isDev) {
     try {
       await mainWindow.loadURL('http://localhost:3000');
@@ -25,7 +26,7 @@ async function createWindow() {
     }
   } else {
     try {
-      await mainWindow.loadFile(path.join(__dirname, '.next/server/pages/index.html'));
+      await mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
       mainWindow.show();
     } catch (error) {
       console.error('Failed to load file:', error);
@@ -36,7 +37,14 @@ async function createWindow() {
   mainWindow.setTitle('LockIn');
 }
 
-app.whenReady().then(createWindow);
+// This method will be called when Electron has finished initialization
+app.whenReady().then(() => {
+  if (process.platform === 'darwin') {
+    // On macOS, set the dock icon
+    app.dock.setIcon(path.join(__dirname, 'src/assets/LockedIn_Logo_Rounded.png'));
+  }
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
