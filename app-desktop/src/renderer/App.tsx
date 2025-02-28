@@ -3,6 +3,11 @@ import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import { Plus, Minus, CheckCircle2, GripVertical } from 'lucide-react';
 import { cn } from './utils';
 import { ScreenRecorder } from './services/ScreenRecorder';
+import { NudgeNotification } from './components/NudgeNotification';
+
+// Constants
+const SCREENSHOT_INTERVAL = 30000; // Take a screenshot every 30 seconds
+const MAX_RECENT_DESCRIPTIONS = 5;
 
 interface TodoItem {
   id: string;
@@ -10,10 +15,19 @@ interface TodoItem {
   completed: boolean;
 }
 
+interface RecentDescription {
+  timestamp: number;
+  description: string;
+}
+
 export function App() {
   const [appState, setAppState] = useState<'welcome' | 'create' | 'complete' | 'accomplished'>('welcome');
   const [items, setItems] = useState<TodoItem[]>([{ id: '1', text: '', completed: false }]);
   const [screenRecorder] = useState(() => new ScreenRecorder());
+  const [recentDescriptions, setRecentDescriptions] = useState<RecentDescription[]>([]);
+
+  // Find the first uncompleted item
+  const firstUncompletedIndex = items.findIndex((item) => !item.completed);
 
   // Handle screen recording based on app state
   useEffect(() => {
@@ -40,12 +54,95 @@ export function App() {
     };
   }, [appState, screenRecorder]);
 
+  // Handle screenshot intervals
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    const takeScreenshot = async () => {
+      try {
+        console.log('Checking if screen recorder is active:', screenRecorder.isActive());
+        if (screenRecorder.isActive()) {
+          console.log('Taking screenshot...');
+          const screenshot = await screenRecorder.takeScreenshot();
+          const timestamp = Date.now();
+          console.log('Screenshot taken, sending to backend for analysis...');
+          
+          // Analyze the screenshot
+          const analysisResponse = await fetch('http://localhost:8000/analyze-screenshot', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              screenshot,
+              currentGoal: items[firstUncompletedIndex]?.text,
+              recentDescriptions,
+            }),
+          });
+
+          if (!analysisResponse.ok) {
+            throw new Error(`Failed to analyze screenshot: ${analysisResponse.status} ${analysisResponse.statusText}`);
+          }
+
+          console.log('Got analysis response, processing...');
+          const analysisData = await analysisResponse.json();
+          console.log('Analysis data:', analysisData);
+          
+          // Update recent descriptions with the new one
+          setRecentDescriptions(prev => {
+            const newDescription = {
+              timestamp,
+              description: analysisData.imageDescription
+            };
+            const updated = [newDescription, ...prev].slice(0, MAX_RECENT_DESCRIPTIONS);
+            console.log('Updated recent descriptions:', updated);
+            return updated;
+          });
+        }
+      } catch (error) {
+        console.error('Screenshot error:', error);
+      }
+    };
+
+    if (screenRecorder.isActive()) {
+      console.log('Screen recorder active, starting screenshot interval');
+      // Take first screenshot immediately
+      takeScreenshot();
+      // Then set up interval
+      intervalId = setInterval(takeScreenshot, SCREENSHOT_INTERVAL);
+    }
+
+    return () => {
+      if (intervalId) {
+        console.log('Cleaning up screenshot interval');
+        clearInterval(intervalId);
+      }
+    };
+  }, [screenRecorder, items, firstUncompletedIndex, recentDescriptions]);
+
+  // Reset recent descriptions when starting a new session
+  useEffect(() => {
+    if (appState === 'complete') {
+      setRecentDescriptions([]);
+    }
+  }, [appState]);
+
   // Add effect to check for completion
   useEffect(() => {
     if (appState === 'complete' && items.length > 0 && items.every(item => item.completed)) {
       setAppState('accomplished');
     }
   }, [items, appState]);
+
+  // Update current goal when active item changes
+  useEffect(() => {
+    if (appState === 'complete') {
+      const currentGoal = items[firstUncompletedIndex]?.text;
+      if (currentGoal) {
+        window.electronAPI.send('set-current-goal', currentGoal);
+      }
+    }
+  }, [items, appState, firstUncompletedIndex]);
 
   const addItem = () => {
     setItems([...items, { id: Date.now().toString(), text: '', completed: false }]);
@@ -62,9 +159,6 @@ export function App() {
   const toggleComplete = (id: string) => {
     setItems(items.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)));
   };
-
-  // Find the first uncompleted item
-  const firstUncompletedIndex = items.findIndex((item) => !item.completed);
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
@@ -248,6 +342,8 @@ export function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      <NudgeNotification />
     </div>
   );
 } 

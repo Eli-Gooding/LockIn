@@ -6,46 +6,35 @@ import base64
 from PIL import Image
 import io
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import aiosqlite
+import logging
 from typing import List, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 # Load environment variables
 load_dotenv()
+
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI()
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Adjust this based on your Electron app's origin
+    allow_origins=["*"],  # Allow all origins in development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Database setup
-DATABASE_URL = "sqlite:///./screenshots.db"
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class Screenshot(Base):
-    __tablename__ = "screenshots"
-
-    id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    image_path = Column(String)
-
-Base.metadata.create_all(bind=engine)
-
-class ScreenshotUpload(BaseModel):
-    timestamp: int
-    image_data: str
 
 class RecentDescription(BaseModel):
     timestamp: int
@@ -72,43 +61,19 @@ def format_recent_activities(descriptions: List[RecentDescription]) -> str:
     
     return "\n".join(activities)
 
-@app.post("/upload-screenshot")
-async def upload_screenshot(screenshot: ScreenshotUpload):
-    try:
-        # Decode base64 image
-        image_data = base64.b64decode(screenshot.image_data.split(',')[1])
-        image = Image.open(io.BytesIO(image_data))
-        
-        # Create screenshots directory if it doesn't exist
-        os.makedirs("screenshots", exist_ok=True)
-        
-        # Save image
-        timestamp = datetime.fromtimestamp(screenshot.timestamp / 1000)
-        filename = f"screenshots/screenshot_{timestamp.strftime('%Y%m%d_%H%M%S')}.png"
-        image.save(filename)
-        
-        # Save to database
-        db = SessionLocal()
-        db_screenshot = Screenshot(timestamp=timestamp, image_path=filename)
-        db.add(db_screenshot)
-        db.commit()
-        db.close()
-        
-        return {"status": "success", "filename": filename}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/screenshots")
-async def get_screenshots():
-    db = SessionLocal()
-    screenshots = db.query(Screenshot).all()
-    db.close()
-    return screenshots
-
 @app.post("/analyze-screenshot")
 async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAnalysisResponse:
     try:
+        logger.info("Starting screenshot analysis")
+        logger.info(f"Current goal: {request.currentGoal}")
+        logger.info(f"Number of recent descriptions: {len(request.recentDescriptions)}")
+        
+        # Log the first few characters of the screenshot to verify we're receiving it
+        screenshot_preview = request.screenshot[:100] + "..." if len(request.screenshot) > 100 else request.screenshot
+        logger.info(f"Received screenshot data (preview): {screenshot_preview}")
+
         # First, get the image description using GPT-4V
+        logger.info("Calling GPT-4V for image description...")
         image_response = client.chat.completions.create(
             model="gpt-4-vision-preview",
             messages=[
@@ -133,12 +98,16 @@ async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAn
         )
         
         image_description = image_response.choices[0].message.content
+        logger.info(f"GPT-4V Response received: {image_description}")
 
         # If there's a current goal, analyze if the user needs a nudge
         nudge = None
         if request.currentGoal:
+            logger.info(f"Analyzing current goal: {request.currentGoal}")
             recent_activities = format_recent_activities(request.recentDescriptions)
+            logger.info(f"Recent activities formatted: {recent_activities}")
             
+            logger.info("Calling GPT-4 for nudge analysis...")
             nudge_response = client.chat.completions.create(
                 model="gpt-4-turbo-preview",
                 messages=[
@@ -170,14 +139,21 @@ async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAn
             potential_nudge = nudge_response.choices[0].message.content.strip()
             if potential_nudge.lower() != "null":
                 nudge = potential_nudge
+                logger.info(f"Generated nudge: {nudge}")
+            else:
+                logger.info("No nudge needed")
 
-        return ScreenshotAnalysisResponse(
+        response = ScreenshotAnalysisResponse(
             imageDescription=image_description,
             nudge=nudge,
             timestamp=int(datetime.now().timestamp() * 1000)
         )
+        logger.info("Analysis complete, sending response")
+        return response
 
     except Exception as e:
+        logger.error(f"Error analyzing screenshot: {str(e)}")
+        logger.exception("Full error details:")  # This will log the full stack trace
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

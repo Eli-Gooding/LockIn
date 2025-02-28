@@ -15,6 +15,9 @@ node_modules/
 .env.test.local
 .env.production.local
 .env
+# Keep .env.example but ignore all other .env files
+.env.*
+!.env.example
 
 # Debug logs
 npm-debug.log*
@@ -22,6 +25,7 @@ yarn-debug.log*
 yarn-error.log*
 logs
 *.log
+.log/
 
 # Editor directories and files
 .idea/
@@ -37,6 +41,10 @@ logs
 *.app
 *.exe
 *.dmg
+*.snap
+*.deb
+*.rpm
+*.AppImage
 
 # TypeScript
 *.tsbuildinfo
@@ -45,4 +53,20 @@ next-env.d.ts
 # Cache
 .cache/
 .webpack/
-.next/ 
+.next/
+.temp/
+
+# Screenshot related
+screenshots/
+*.db
+screenshots.db
+/server/screenshots/
+/server/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Coverage and test reports
+coverage/
+.nyc_output/
+test-results/ 

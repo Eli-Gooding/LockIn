@@ -2,19 +2,23 @@
   "name": "app-desktop",
   "version": "1.0.0",
   "description": "LockIn Electron Desktop App",
-  "main": "main.js",
+  "main": "dist/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "concurrently \"webpack serve\" \"wait-on http://localhost:3000 && electron .\"",
-    "build": "webpack --mode production"
+    "dev": "npm run build:main && concurrently \"webpack serve\" \"wait-on http://localhost:3000 && electron .\"",
+    "build": "npm run build:main && webpack --mode production",
+    "build:main": "tsc main.ts --outDir dist && webpack",
+    "watch": "concurrently \"tsc main.ts --outDir dist --watch\" \"webpack --watch\""
   },
   "dependencies": {
+    "clsx": "^2.1.1",
     "electron": "^25.3.0",
     "framer-motion": "^11.0.3",
     "lucide-react": "^0.330.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "tailwind-merge": "^2.2.1"
+    "sqlite3": "^5.1.7",
+    "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
     "@babel/core": "^7.23.9",
@@ -22,12 +26,18 @@
     "@babel/preset-typescript": "^7.23.3",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "@types/sqlite3": "^3.1.11",
     "babel-loader": "^9.1.3",
+    "buffer": "^6.0.3",
     "concurrently": "^8.2.2",
     "css-loader": "^6.10.0",
+    "events": "^3.3.0",
     "html-webpack-plugin": "^5.6.0",
+    "path-browserify": "^1.0.1",
     "postcss": "^8.4.35",
     "postcss-loader": "^8.1.0",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
     "style-loader": "^3.3.4",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",

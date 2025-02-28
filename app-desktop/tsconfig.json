@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ESNext",
+    "module": "CommonJS",
     "moduleResolution": "node",
     "jsx": "react",
     "strict": true,
@@ -9,14 +9,18 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
+    "outDir": "dist",
     "paths": {
-      "*": ["src/*"]
+      "@/*": ["src/*"]
     },
     "typeRoots": [
       "./node_modules/@types",
       "./src/renderer/types"
     ]
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "main.ts"
+  ],
   "exclude": ["node_modules"]
 }
