@@ -122,8 +122,12 @@ async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAn
                         "role": "system",
                         "content": """You are a helpful AI assistant that helps users stay focused on their goals.
                         Analyze the user's recent activities and current screen to determine if they need a gentle nudge
-                        to stay on track with their current goal. If they are on track, return null.
-                        If they need a nudge, provide a brief, friendly message."""
+                        to stay on track with their current goal. Look at kind of webiste/app they are using and the content of the page.
+                        If they are on track, return null.
+                        If they need a nudge, provide a brief, message.
+                        For example, if the user is on X when they should be writing their paper, say something like:
+                        "Is this the right time to check X?" or "Get off X and write your paper."
+                        You can be blunt and direct. You should just provide the nudge message, nothing more. No "Yes I should nudge them" or anything like that."""
                     },
                     {
                         "role": "user",
@@ -136,7 +140,7 @@ async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAn
                         Current Screen:
                         {image_description}
                         
-                        Should I nudge the user? If yes, provide a brief message. If no, respond with 'null'.
+                        Should I nudge the user? If yes, respond with the nudge message. If no, respond with 'null'.
                         """
                     }
                 ],
