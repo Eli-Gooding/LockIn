@@ -74,8 +74,15 @@ async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAn
 
         # First, get the image description using GPT-4V
         logger.info("Calling GPT-4V for image description...")
+        
+        # Ensure the base64 string is properly formatted as a data URL
+        if not request.screenshot.startswith('data:image/'):
+            image_url = f"data:image/png;base64,{request.screenshot}"
+        else:
+            image_url = request.screenshot
+            
         image_response = client.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model="gpt-4o",
             messages=[
                 {
                     "role": "user",
@@ -87,7 +94,7 @@ async def analyze_screenshot(request: ScreenshotAnalysisRequest) -> ScreenshotAn
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": request.screenshot,
+                                "url": image_url,
                                 "detail": "low"
                             }
                         }
