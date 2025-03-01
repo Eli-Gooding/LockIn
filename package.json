@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "@types/node-notifier": "^8.0.5",
+    "cross-env": "^7.0.3"
+  },
+  "dependencies": {
+    "electron-log": "^5.3.0",
+    "electron-notifier": "^0.0.0",
+    "electron-updater": "^6.3.9"
+  }
+}

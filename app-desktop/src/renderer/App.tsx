@@ -5,6 +5,9 @@ import { cn } from './utils';
 import { ScreenRecorder } from './services/ScreenRecorder';
 import { NudgeNotification } from './components/NudgeNotification';
 
+// Import the types
+import './types'; // This will make TypeScript recognize the global Window interface
+
 // Constants
 const SCREENSHOT_INTERVAL = 30000; // Take a screenshot every 30 seconds
 const MAX_RECENT_DESCRIPTIONS = 5;
@@ -34,8 +37,10 @@ export function App() {
     const handleScreenRecording = async () => {
       try {
         if (appState === 'complete' && !screenRecorder.isActive()) {
+          console.log('Starting screen recording for complete state');
           await screenRecorder.startRecording();
         } else if (appState !== 'complete' && screenRecorder.isActive()) {
+          console.log('Stopping screen recording as state changed from complete');
           screenRecorder.stopRecording();
         }
       } catch (error) {
@@ -49,6 +54,7 @@ export function App() {
     // Cleanup on unmount
     return () => {
       if (screenRecorder.isActive()) {
+        console.log('Cleanup: stopping screen recording');
         screenRecorder.stopRecording();
       }
     };
@@ -95,6 +101,24 @@ export function App() {
           console.log('Updated recent descriptions:', updated);
           return updated;
         });
+
+        // If there's a nudge message, ensure it's displayed as a system notification
+        if (analysisData.nudge && analysisData.nudge.trim() !== '') {
+          console.log('Received nudge message, sending system notification:', analysisData.nudge);
+          
+          try {
+            // Send the nudge message to the main process to show a system notification
+            window.electronAPI.send('show-notification', {
+              title: 'LockIn Reminder',
+              body: analysisData.nudge
+            });
+            console.log('System notification sent successfully');
+          } catch (error) {
+            console.error('Failed to send system notification:', error);
+          }
+        } else {
+          console.log('No nudge message received from server');
+        }
       } catch (error) {
         console.error('Screenshot error:', error);
         // Don't stop the interval on error, just log it
@@ -116,8 +140,6 @@ export function App() {
         console.log('Cleaning up screenshot interval');
         clearInterval(intervalId);
       }
-      // Make sure to stop recording when unmounting or changing state
-      screenRecorder.stopRecording();
     };
   }, [appState, screenRecorder, items, firstUncompletedIndex, recentDescriptions]);
 
@@ -131,7 +153,18 @@ export function App() {
   // Add effect to check for completion
   useEffect(() => {
     if (appState === 'complete' && items.length > 0 && items.every(item => item.completed)) {
-      setAppState('accomplished');
+      console.log('All items completed, transitioning to accomplished state in 2 seconds');
+      // Add a 2-second delay before transitioning to accomplished state
+      const timer = setTimeout(() => {
+        console.log('Transitioning to accomplished state now');
+        setAppState('accomplished');
+      }, 2000);
+
+      // Clean up timer if component unmounts or state changes
+      return () => {
+        console.log('Cleaning up completion timer');
+        clearTimeout(timer);
+      };
     }
   }, [items, appState]);
 
@@ -161,8 +194,45 @@ export function App() {
     setItems(items.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)));
   };
 
+  // Add this function to test notifications
+  const testNotification = async () => {
+    console.log('Testing system notification...');
+    try {
+      // Use invoke to call the test-notification handler
+      const result = await window.electronAPI.invoke('test-notification');
+      console.log('Test notification result:', result);
+      
+      if (!result.success) {
+        console.error('Test notification failed:', result.message);
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      
+      // Fallback to using send if invoke fails
+      try {
+        console.log('Trying fallback method for test notification...');
+        window.electronAPI.send('show-notification', {
+          title: 'LockIn Test',
+          body: 'This is a test notification using fallback method.'
+        });
+      } catch (fallbackError) {
+        console.error('Fallback notification also failed:', fallbackError);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
+      {/* Add test button in development mode */}
+      {process.env.NODE_ENV !== 'production' && (
+        <button
+          onClick={testNotification}
+          className="fixed bottom-4 left-4 px-3 py-1 bg-red-600 text-white text-xs rounded-md z-50"
+        >
+          Test System Notification
+        </button>
+      )}
+      
       <AnimatePresence mode="wait">
         {appState === 'welcome' && (
           <motion.div

@@ -82,6 +82,19 @@ const preloadConfig = {
     path: path.resolve(__dirname, 'dist'),
     filename: 'preload.js',
   },
+  resolve: {
+    ...commonConfig.resolve,
+    fallback: {
+      "path": false,
+      "fs": false,
+      "os": false,
+      "util": false,
+      "events": false,
+      "stream": false,
+      "buffer": false,
+      "process": false,
+    }
+  },
 };
 
 module.exports = [rendererConfig, preloadConfig]; 
