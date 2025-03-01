@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on(channel, listener),
   removeListener: (channel: string, listener: (...args: any[]) => void) =>
     ipcRenderer.removeListener(channel, listener),
+  getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
 }); 

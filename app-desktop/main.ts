@@ -217,4 +217,29 @@ function sendNudge(nudge: string) {
 app.on('before-quit', () => {
   screenshotManager.stopCapturing();
   screenshotManager.clearDatabase();
+});
+
+// Add IPC handlers for screenshot control
+ipcMain.handle('get-screen-sources', async () => {
+  try {
+    console.log('Getting screen sources...');
+    const sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: 1920, height: 1080 }
+    });
+    console.log(`Found ${sources.length} screen sources`);
+    
+    // Convert the sources to a format safe for IPC
+    const processedSources = sources.map(source => ({
+      id: source.id,
+      name: source.name,
+      thumbnailDataURL: source.thumbnail.toDataURL(),
+      display_id: source.display_id
+    }));
+    
+    return processedSources;
+  } catch (error) {
+    console.error('Error getting screen sources:', error);
+    throw error;
+  }
 }); 

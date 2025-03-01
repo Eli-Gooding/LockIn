@@ -40,20 +40,40 @@ export class ScreenshotManager {
     logger.info("Database path:", dbPath); // Our logger
     
     this.db = new Database(dbPath);
-    this.initDatabase();
-    console.log('✅ SCREENSHOT MANAGER INITIALIZED');
+    this.initDatabase()
+      .then(() => {
+        console.log('✅ SCREENSHOT MANAGER INITIALIZED');
+        logger.info("ScreenshotManager initialization complete");
+      })
+      .catch((error) => {
+        console.error('❌ Failed to initialize database:', error);
+        logger.error("Failed to initialize database:", error);
+      });
   }
 
   private initDatabase() {
-    this.db.run(`
-      CREATE TABLE IF NOT EXISTS screenshots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        image_description TEXT,
-        current_goal TEXT,
-        nudge TEXT
-      )
-    `);
+    logger.info("Initializing database...");
+    return new Promise<void>((resolve, reject) => {
+      this.db.serialize(() => {
+        this.db.run(`
+          CREATE TABLE IF NOT EXISTS screenshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            image_description TEXT,
+            current_goal TEXT,
+            nudge TEXT
+          )
+        `, (err) => {
+          if (err) {
+            logger.error("Error creating database table:", err);
+            reject(err);
+          } else {
+            logger.info("Database table created/verified successfully");
+            resolve();
+          }
+        });
+      });
+    });
   }
 
   public setCurrentGoal(goal: string) {

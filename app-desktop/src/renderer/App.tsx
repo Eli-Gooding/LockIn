@@ -60,56 +60,55 @@ export function App() {
 
     const takeScreenshot = async () => {
       try {
-        console.log('Checking if screen recorder is active:', screenRecorder.isActive());
-        if (screenRecorder.isActive()) {
-          console.log('Taking screenshot...');
-          const screenshot = await screenRecorder.takeScreenshot();
-          const timestamp = Date.now();
-          console.log('Screenshot taken, sending to backend for analysis...');
-          
-          // Analyze the screenshot
-          const analysisResponse = await fetch('http://localhost:8000/analyze-screenshot', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              screenshot,
-              currentGoal: items[firstUncompletedIndex]?.text,
-              recentDescriptions,
-            }),
-          });
+        console.log('Taking screenshot...');
+        const screenshot = await screenRecorder.takeScreenshot();
+        console.log('Screenshot taken, sending to backend for analysis...');
+        
+        // Analyze the screenshot
+        const analysisResponse = await fetch('http://localhost:8000/analyze-screenshot', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            screenshot,
+            currentGoal: items[firstUncompletedIndex]?.text,
+            recentDescriptions,
+          }),
+        });
 
-          if (!analysisResponse.ok) {
-            throw new Error(`Failed to analyze screenshot: ${analysisResponse.status} ${analysisResponse.statusText}`);
-          }
-
-          console.log('Got analysis response, processing...');
-          const analysisData = await analysisResponse.json();
-          console.log('Analysis data:', analysisData);
-          
-          // Update recent descriptions with the new one
-          setRecentDescriptions(prev => {
-            const newDescription = {
-              timestamp,
-              description: analysisData.imageDescription
-            };
-            const updated = [newDescription, ...prev].slice(0, MAX_RECENT_DESCRIPTIONS);
-            console.log('Updated recent descriptions:', updated);
-            return updated;
-          });
+        if (!analysisResponse.ok) {
+          throw new Error(`Failed to analyze screenshot: ${analysisResponse.status} ${analysisResponse.statusText}`);
         }
+
+        console.log('Got analysis response, processing...');
+        const analysisData = await analysisResponse.json();
+        console.log('Analysis data:', analysisData);
+        
+        // Update recent descriptions with the new one
+        setRecentDescriptions(prev => {
+          const newDescription = {
+            timestamp: Date.now(),
+            description: analysisData.imageDescription
+          };
+          const updated = [newDescription, ...prev].slice(0, MAX_RECENT_DESCRIPTIONS);
+          console.log('Updated recent descriptions:', updated);
+          return updated;
+        });
       } catch (error) {
         console.error('Screenshot error:', error);
+        // Don't stop the interval on error, just log it
       }
     };
 
-    if (screenRecorder.isActive()) {
-      console.log('Screen recorder active, starting screenshot interval');
+    // Only set up the interval if we're in the 'complete' state
+    if (appState === 'complete') {
+      console.log('Setting up screenshot interval in complete state');
       // Take first screenshot immediately
       takeScreenshot();
       // Then set up interval
       intervalId = setInterval(takeScreenshot, SCREENSHOT_INTERVAL);
+      console.log('Screenshot interval set up');
     }
 
     return () => {
@@ -117,8 +116,10 @@ export function App() {
         console.log('Cleaning up screenshot interval');
         clearInterval(intervalId);
       }
+      // Make sure to stop recording when unmounting or changing state
+      screenRecorder.stopRecording();
     };
-  }, [screenRecorder, items, firstUncompletedIndex, recentDescriptions]);
+  }, [appState, screenRecorder, items, firstUncompletedIndex, recentDescriptions]);
 
   // Reset recent descriptions when starting a new session
   useEffect(() => {
